@@ -9,9 +9,7 @@
 import configparser
 import itertools
 import logging
-import os
 import random
-import re
 import smtplib
 import sys
 import time
@@ -72,9 +70,9 @@ def send_email(cfg, links):
                 e_c.name, n_links, "".join(["\n{0:>12}. {1}".format(idx, link) for idx, link in enumerate(links, 1)]),
             ),
         )
+        server.quit()
     except smtplib.SMTPException as e:
         logger.error("Sending email ran into the following issue:\n{0}".format(e))
-    server.quit()
     sys.exit(logger.info("Successfully sent list of project to {0}".format(e_c.name)))
 
 
@@ -86,15 +84,32 @@ def write_to_file(name, n_links, links):
         """.format(
         name, n_links, "".join(["\n{0:>12}. {1}".format(idx, link) for idx, link in enumerate(links, 1)]),
     )
-    open("open-issue-projects.txt", "w").writelines(proj_output).close()
+    with open("open-issue-projects.txt", "w") as f:
+        f.writelines(proj_output)
     sys.exit(logger.info(proj_output))
 
 
 def main():
     logger.info("Starting process...")
     filename = r"config.ini"
-    config = configparser.ConfigParser(allow_no_value=True).read(filename)
-    interests, labels = list(config._sections.get("Programming Interests").keys()), list(config._sections.get("Issue Labels").keys())
+    config = configparser.ConfigParser(allow_no_value=True)
+    config.read(filename)
+
+    required_keys = ["Programming Interests", "Issue Labels"]
+
+    for required_key in required_keys:
+        if required_key not in config:
+            raise Exception(f"Please fill out [{required_key}] Section in {filename} file")
+
+    interests = []
+    labels = []
+
+    for key, _ in config.items("Programming Interests"):
+        interests.append(key)
+
+    for key, _ in config.items("Issue Labels"):
+        labels.append(key)
+
     send_email(config, multiprocess_links(gen_query_urls(cfg=config, ints=interests, lbls=labels)))
 
 
